@@ -1,0 +1,23 @@
+{
+	"toolChain": "xilinx",
+	"prjName": {
+		"PL": "code"
+	},
+	"arch": {
+		"prjPath": "",
+		"hardware": {
+			"src": "",
+			"sim": "",
+			"data": ""
+		},
+		"software": {
+			"src": "",
+			"data": ""
+		}
+	},
+	"soc": {
+		"core": "none"
+	},
+	"enableShowLog": false,
+	"device": "none"
+}
