@@ -12,7 +12,8 @@
 // - WB:    stage state,
 // 2.generate immediate number
 module decoder#(parameter LEN = 32)
-               (input rdy_in,
+               (input rst,
+                input rdy_in,
                 input wire [LEN-1:0] instruction,
                 output wire [2:0] ex_stage_state,
                 output wire [3:0] opcode,
@@ -45,7 +46,7 @@ module decoder#(parameter LEN = 32)
     assign immediate       = imm;
     
     always @(*) begin
-        if (rdy_in) begin
+        if ((!rst)&&rdy_in) begin
             case (typecode)
                 `LUI:    begin
                     ex       = 3'b110;          // IMMONLY

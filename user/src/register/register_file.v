@@ -3,6 +3,7 @@
 
 module reg_file #(parameter LEN = 32)
                  (input wire clk,             // clock
+                  input rst,
                   input rdy_in,
                   input wire [4:0] rs1,       // index of rs1
                   input wire [4:0] rs2,       // index of rs2
@@ -23,7 +24,7 @@ module reg_file #(parameter LEN = 32)
     assign rs2_data = reg2;
     
     always @(posedge clk) begin
-        if (rdy_in)begin
+        if ((!rst)&&rdy_in)begin
             // read from register
             // if (read_flag == 1) begin
             reg1 <= register[rs1_index];

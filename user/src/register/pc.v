@@ -16,10 +16,16 @@ module pc#(parameter LEN = 32)
     
     // store pc state
     reg [LEN-1:0] pc_register;
-    reg flag;
+    reg flag     ;
     assign cur_pc  = pc_register;
     assign if_flag = flag;
-    
+
+    // start executing
+    // begin with instruction fetch
+    always @(negedge rst) begin
+        flag = 1;
+    end
+
     always @(posedge clk) begin
         if (rst == `TRUE) begin
             pc_register <= 0;
@@ -38,7 +44,7 @@ module pc#(parameter LEN = 32)
                 else begin
                     flag = 0;
                 end
-            end 
+            end
     end
     
 endmodule

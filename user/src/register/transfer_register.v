@@ -5,6 +5,7 @@
 // Instrction fetch \ Instruction decode
 module if_id_transfer_reg #(parameter LEN = 32)
                            (input wire clk,           // input pc_update_signal, output o_pc_update_signal, 
+                            input rst,
                             input rdy_in,
                             input [LEN-1:0] c_pc,
                             output [LEN-1:0] o_c_pc,
@@ -18,7 +19,7 @@ module if_id_transfer_reg #(parameter LEN = 32)
     assign o_c_pc                = cur_pc;
     assign o_n_pc                = new_pc;
     always @(posedge clk)begin
-        if (rdy_in) begin
+        if ((!rst)&&rdy_in) begin
             // pc_update <= pc_update_signal;
             cur_pc       <= c_pc;
             new_pc       <= n_pc;
@@ -32,6 +33,7 @@ endmodule
     module id_ex_transfer_reg #(parameter LEN = 32)(
         // clock
         input   wire clk,
+        input rst,
         input rdy_in,
         // PC
         // signal
@@ -83,7 +85,7 @@ endmodule
         assign o_c_pc                = cur_pc;
         assign o_n_pc                = new_pc;
         always @(posedge clk)begin
-            if (rdy_in) begin
+            if ((!rst)&&rdy_in) begin
                 // pc_update <= pc_update_signal;
                 cur_pc       <= c_pc;
                 new_pc       <= n_pc;
@@ -96,7 +98,7 @@ endmodule
         
         assign o_ex_stage_state = cur_ex_stage_state;
         always @(posedge clk)begin
-            if (rdy_in) begin
+            if ((!rst)&&rdy_in) begin
                 cur_ex_stage_state <= ex_stage_state;
             end
         end
@@ -107,7 +109,7 @@ endmodule
         assign o_branch_flag     = cur_branch_flag;
         assign o_mem_stage_state = cur_mem_stage_state;
         always @(posedge clk)begin
-            if (rdy_in) begin
+            if ((!rst)&&rdy_in) begin
                 cur_branch_flag = branch_flag;
                 cur_mem_stage_state <= mem_stage_state;
             end
@@ -117,7 +119,7 @@ endmodule
         
         assign o_wb_stage_state = cur_wb_stage_state;
         always @(posedge clk)begin
-            if (rdy_in) begin
+            if ((!rst)&&rdy_in) begin
                 cur_wb_stage_state <= wb_stage_state;
             end
         end
@@ -131,7 +133,7 @@ endmodule
         assign o_rs1 = cur_rs1;
         assign o_rs2 = cur_rs2;
         always @(posedge clk)begin
-            if (rdy_in) begin
+            if ((!rst)&&rdy_in) begin
                 cur_imm <= imm;
                 cur_rs1 <= rs1;
                 cur_rs2 <= rs2;
@@ -143,7 +145,7 @@ endmodule
         
         assign o_opcode = cur_opcode;
         always @(posedge clk) begin
-            if (rdy_in) begin
+            if ((!rst)&&rdy_in) begin
                 cur_opcode <= opcode;
             end
         end
@@ -153,7 +155,7 @@ endmodule
         
         assign o_rd = cur_rd;
         always @(posedge clk) begin
-            if (rdy_in) begin
+            if ((!rst)&&rdy_in) begin
                 cur_rd <= rd;
             end
         end
@@ -164,6 +166,7 @@ endmodule
         module ex_mem_transfer_reg #(parameter LEN = 32)(
             // clock
             input   wire clk,
+            input rst,
             input rdy_in,
             // PC
             // signal
@@ -213,7 +216,7 @@ endmodule
             assign o_offset_pc           = cur_offset_pc;
             
             always @(posedge clk)begin
-                if (rdy_in) begin
+                if ((!rst)&&rdy_in) begin
                     // pc_update  <= pc_update_signal;
                     cur_pc        <= c_pc;
                     new_pc        <= n_pc;
@@ -229,7 +232,7 @@ endmodule
             assign o_branch_flag     = cur_branch_flag;
             assign o_mem_stage_state = cur_mem_stage_state;
             always @(posedge clk)begin
-                if (rdy_in) begin
+                if ((!rst)&&rdy_in) begin
                     cur_branch_flag = branch_flag;
                     cur_mem_stage_state <= mem_stage_state;
                 end
@@ -239,7 +242,7 @@ endmodule
             
             assign o_wb_stage_state = cur_wb_stage_state;
             always @(posedge clk)begin
-                if (rdy_in) begin
+                if ((!rst)&&rdy_in) begin
                     cur_wb_stage_state <= wb_stage_state;
                 end
             end
@@ -253,7 +256,7 @@ endmodule
             assign o_result    = cur_result;
             assign o_rs2       = cur_rs2;
             always @(posedge clk)begin
-                if (rdy_in) begin
+                if ((!rst)&&rdy_in) begin
                     cur_sign_bits <= sign_bits;
                     cur_result    <= result;;
                     cur_rs2       <= rs2;
@@ -265,7 +268,7 @@ endmodule
             
             assign o_rd = cur_rd;
             always @(posedge clk) begin
-                if (rdy_in) begin
+                if ((!rst)&&rdy_in) begin
                     cur_rd <= rd;
                 end
             end
@@ -275,6 +278,7 @@ endmodule
             module mem_wb_transfer_reg #(parameter LEN = 32)(
                 // clock
                 input   wire clk,
+                input rst,
                 input rdy_in,
                 // PC
                 // signal
@@ -312,7 +316,7 @@ endmodule
                 assign o_c_pc                = cur_pc;
                 assign o_n_pc                = new_pc;
                 always @(posedge clk)begin
-                    if (rdy_in) begin
+                    if ((!rst)&&rdy_in) begin
                         // pc_update <= pc_update_signal;
                         cur_pc       <= c_pc;
                         new_pc       <= n_pc;
@@ -325,7 +329,7 @@ endmodule
                 
                 assign o_wb_stage_state = cur_wb_stage_state;
                 always @(posedge clk)begin
-                    if (rdy_in) begin
+                    if ((!rst)&&rdy_in) begin
                         cur_wb_stage_state <= wb_stage_state;
                     end
                 end
@@ -337,7 +341,7 @@ endmodule
                 assign o_result   = cur_result;
                 assign o_mem_data = cur_mem_data;
                 always @(posedge clk)begin
-                    if (rdy_in) begin
+                    if ((!rst)&&rdy_in) begin
                         cur_result   <= result;
                         cur_mem_data <= mem_data;
                     end
@@ -348,7 +352,7 @@ endmodule
                 
                 assign o_rd = cur_rd;
                 always @(posedge clk) begin
-                    if (rdy_in) begin
+                    if ((!rst)&&rdy_in) begin
                         cur_rd <= rd;
                     end
                 end

@@ -11,7 +11,8 @@
 // - result
 // output rd_data and control signal
 module rd_data_mux#(parameter LEN = 32)
-                   (input rdy_in,
+                   (input rst,
+                    input rdy_in,
                     input [LEN-1:0] npc,
                     input [LEN-1:0]mem_data,
                     input [LEN-1:0]result,
@@ -25,7 +26,7 @@ module rd_data_mux#(parameter LEN = 32)
     assign wb_flag = flag;
     
     always @(*) begin
-        if (rdy_in) begin
+        if ((!rst)&&rdy_in) begin
             case (wb_stage_state)
                 `NONE:flag = 0;
                 `NPC:begin
@@ -51,16 +52,19 @@ endmodule
     // use last 17 bits as output
     module mem_addr_mux#(parameter LEN = 32,
         parameter ADDR_WIDTH = 17)
-        (input rdy_in,
+        (
+        input rst,
+        input rdy_in,
         input pc_flag,
         input [LEN-1:0] inst_addr,
         input  [LEN-1:0] data_addr,
+        // output reg inst_fetch_flag,
         output [ADDR_WIDTH-1:0] mem_addr);
         
         reg [ADDR_WIDTH-1:0] addr;
         assign mem_addr = addr;
         always @(*) begin
-            if (rdy_in) begin
+            if ((!rst)&&rdy_in) begin
                 if (pc_flag) begin
                     addr = inst_addr[ADDR_WIDTH-1:0];
                 end
@@ -75,6 +79,8 @@ endmodule
         // select data from mem
         // inst or mem_read
         module mem_data_mux#(parameter LEN = 32) (
+            input clk,
+            input rst,
             input rdy_in,
             input pc_flag,
             input [LEN-1:0] data,
@@ -82,15 +88,17 @@ endmodule
             output [LEN-1:0] mem_read
             );
             
+            reg inst_flag;
             reg [LEN-1:0] instruction;
             reg [LEN-1:0] read_data;
             
             assign inst     = instruction;
             assign mem_read = read_data;
             
-            always @(*) begin
-                if (rdy_in) begin
-                    if (pc_flag) begin
+            always @(posedge clk) begin
+                if ((!rst)&&rdy_in) begin
+                    inst_flag <= pc_flag;
+                    if (inst_flag) begin
                         instruction = data;
                     end
                     else begin

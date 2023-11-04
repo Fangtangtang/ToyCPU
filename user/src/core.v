@@ -39,7 +39,7 @@ module cpu#(parameter LEN = 32,
     .cur_pc         	(cur_pc)
     );
     
-    wire if_flag;
+    wire if_flag; // true if is instruction fetch
     wire [LEN-1:0] 	cur_pc;
     wire [LEN-1:0] 	npc;
     
@@ -55,6 +55,7 @@ module cpu#(parameter LEN = 32,
     
     // IF
     mem_addr_mux u_mem_addr_mux(
+    .rst            (rst),
     .rdy_in         (rdy_in),
     .pc_flag        (if_flag),
     .inst_addr      (cur_pc),
@@ -63,7 +64,9 @@ module cpu#(parameter LEN = 32,
     );
     
     mem_data_mux u_mem_data_mux(
-    .rdy_in             (rdy_in),
+    .clk            (clk),
+    .rst            (rst),
+    .rdy_in         (rdy_in),
     .pc_flag        (if_flag),
     .data           (mem_data),
     .inst           (instruction),
@@ -77,8 +80,9 @@ module cpu#(parameter LEN = 32,
     wire [LEN-1:0] 	o_n_pc;
     
     if_id_transfer_reg u_if_id_transfer_reg(
-    .clk    	        (clk),
-    .rdy_in             (rdy_in),
+    .clk    	    (clk),
+    .rst            (rst),
+    .rdy_in         (rdy_in),
     .c_pc   	    (cur_pc),
     .o_c_pc 	    (o_c_pc),
     .n_pc   	    (npc),
@@ -96,6 +100,7 @@ module cpu#(parameter LEN = 32,
     wire [LEN-1:0] 	immediate;
     
     decoder u_decoder(
+    .rst                (rst),
     .rdy_in             (rdy_in),
     .instruction     	(instruction),
     .ex_stage_state  	(ex_stage_state),
@@ -121,7 +126,7 @@ module cpu#(parameter LEN = 32,
     
     reg_file u_reg_file(
     .clk       	(clk),
-    .rdy_in             (rdy_in),
+    .rdy_in     (rdy_in),
     .rs1       	(rs1),
     .rs2       	(rs2),
     .wb_flag   	(wb_flag),
@@ -149,6 +154,7 @@ module cpu#(parameter LEN = 32,
     
     id_ex_transfer_reg u_id_ex_transfer_reg(
     .clk               	(clk),
+    .rst                (rst),
     .rdy_in             (rdy_in),
     .c_pc              	(o_c_pc),
     .o_c_pc            	(id_ex_o_c_pc),
@@ -190,7 +196,8 @@ module cpu#(parameter LEN = 32,
     wire [1:0]     	sign_bits;
     
     alu u_alu(
-    .rdy_in             (rdy_in),
+    .rst            (rst),
+    .rdy_in         (rdy_in),
     .rs1          	(o_rs1),
     .rs2          	(o_rs2),
     .imm          	(o_imm),
@@ -217,6 +224,7 @@ module cpu#(parameter LEN = 32,
     assign special_npc = o_offset_pc;
     ex_mem_transfer_reg u_ex_mem_transfer_reg(
     .clk               	(clk),
+    .rst                (rst),
     .rdy_in             (rdy_in),
     .c_pc               (id_ex_o_c_pc),
     .o_c_pc             (ex_mem_o_c_pc),
@@ -242,6 +250,7 @@ module cpu#(parameter LEN = 32,
     
     // MEM
     branch_controller u_branch_controller(
+    .rst                (rst),
     .rdy_in             (rdy_in),
     .branch_flag     	(ex_mem_o_branch_flag),
     .sign_bits       	(o_sign_bits),
@@ -264,6 +273,7 @@ module cpu#(parameter LEN = 32,
     assign prev_pc = mem_wb_o_c_pc;
     mem_wb_transfer_reg u_mem_wb_transfer_reg(
     .clk              	(clk),
+    .rst                (rst),
     .rdy_in             (rdy_in),
     .c_pc               (ex_mem_o_c_pc),
     .o_c_pc             (mem_wb_o_c_pc),
@@ -286,6 +296,7 @@ module cpu#(parameter LEN = 32,
     assign wb_flag        = o_wb_flag;
     
     rd_data_mux u_rd_data_mux(
+    .rst                (rst),
     .rdy_in             (rdy_in),
     .npc                (mem_wb_o_n_pc),
     .mem_data           (o_mem_data),

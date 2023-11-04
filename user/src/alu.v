@@ -8,7 +8,8 @@
 `include"src/defines.v"
 
 module alu#(parameter LEN = 32)
-           (input rdy_in,
+           (input rst,
+            input rdy_in,
             input [LEN - 1:0] rs1,
             input [LEN - 1:0] rs2,
             input [LEN - 1:0] imm,
@@ -19,7 +20,7 @@ module alu#(parameter LEN = 32)
             output reg [1:0] sign_bits);
     
     always @(*) begin
-        if (rdy_in) begin
+        if ((!rst)&&rdy_in) begin
             case (ex_stage_state)
                 `BRANCHCOND:            result = rs1 - rs2;
                 `MEMADDR:               result = rs1 + imm;
