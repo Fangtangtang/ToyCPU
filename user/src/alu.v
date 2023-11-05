@@ -4,50 +4,61 @@
 // universal version
 // mainly used in arithmetic and logic operation in execution stage
 
-// `include"defines.v"
 `include"src/defines.v"
 
 module alu#(parameter LEN = 32)
            (input rst,
             input rdy_in,
+            input alu_ex_signal,
             input [LEN - 1:0] rs1,
             input [LEN - 1:0] rs2,
             input [LEN - 1:0] imm,
             input [LEN - 1:0] pc,
             input [2:0] ex_stage_state,
             input [3:0] opcode,
+            output alu_stall,
             output reg [LEN - 1:0] result,
             output reg [1:0] sign_bits);
     
+    reg flag = 0;
+    
+    assign alu_stall = flag;
+    
     always @(*) begin
         if ((!rst)&&rdy_in) begin
-            case (ex_stage_state)
-                `BRANCHCOND:            result = rs1 - rs2;
-                `MEMADDR:               result = rs1 + imm;
-                `IMMEXPR:begin
-                    case (opcode)
-                        `ADDI:          result = rs1 + imm;
-                        // todo
-                    endcase
+            if (alu_ex_signal) begin
+                flag = 1;
+                case (ex_stage_state)
+                    `BRANCHCOND:            result = rs1 - rs2;
+                    `MEMADDR:               result = rs1 + imm;
+                    `IMMEXPR:begin
+                        case (opcode)
+                            `ADDI:          result = rs1 + imm;
+                            // todo
+                        endcase
+                    end
+                    `BINARYEXPR:begin
+                        case (opcode)
+                            `ADD:           result = rs1 + rs2;
+                            // todo
+                        endcase
+                    end
+                    `PCBASED:               result = pc + imm;
+                    `IMMONLY:               result = imm;
+                endcase
+                // todo: different cases for branch
+                if (result>0) begin
+                    sign_bits = `POS;
                 end
-                `BINARYEXPR:begin
-                    case (opcode)
-                        `ADD:           result = rs1 + rs2;
-                        // todo
-                    endcase
+                else if (result == 0) begin
+                    sign_bits = `ZERO;
                 end
-                `PCBASED:               result = pc + imm;
-                `IMMONLY:               result = imm;
-            endcase
-            // todo: different cases for branch
-            if (result>0) begin
-                sign_bits = `POS;
-            end
-            else if (result == 0) begin
-                sign_bits = `ZERO;
+                else begin
+                    sign_bits = `NEG;
+                end
             end
             else begin
-                sign_bits = `NEG;
+                flag = 0;
             end
         end
     end

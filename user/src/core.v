@@ -9,6 +9,7 @@
 `include"src/selector/decoder.v"
 `include"src/selector/branch_controller.v"
 `include"src/selector/mux.v"
+`include"src/hazard.v"
 
 
 module cpu#(parameter LEN = 32,
@@ -16,10 +17,33 @@ module cpu#(parameter LEN = 32,
            (input clk,
             input rst,
             input rdy_in,
+            input mem_stall,
             input [LEN-1:0] mem_data,          // data input bus
+            // output mem_ex_signal,
             output [ADDR_WIDTH-1:0] mem_addr,
             output [LEN-1:0] write_data,       // data output bus
             output [1:0] mem_vis_stage_state);
+    
+    // HAZARD
+    wire pc_stall  ;
+    wire reg_stall ;
+    wire alu_stall ;
+    
+    wire pc_ex_signal;
+    wire reg_ex_signal;
+    wire alu_ex_signal;
+    wire mem_ex_signal; // useless?
+    
+    hazard u_hazard(
+    .pc_stall       (pc_stall),
+    .reg_stall      (reg_stall),
+    .alu_stall      (alu_stall),
+    .mem_stall      (mem_stall),
+    .pc_ex_signal   (pc_ex_signal),
+    .reg_ex_signal  (reg_ex_signal),
+    .alu_ex_signal  (alu_ex_signal),
+    .mem_ex_signal  (mem_ex_signal)
+    );
     
     // PC
     wire [LEN-1:0]  special_npc;
@@ -31,10 +55,11 @@ module cpu#(parameter LEN = 32,
     .clk            	(clk),
     .rst                (rst),
     .rdy_in             (rdy_in),
-    .pre_pc             (prev_pc),
+    .pc_ex_signal       (pc_ex_signal),
     .npc            	(npc),
     .special_npc    	(special_npc),
-    .control_signal 	(use_special_pc_flag),
+    .use_special_pc_flag(use_special_pc_flag),
+    .pc_stall           (pc_stall),
     .if_flag            (if_flag),
     .cur_pc         	(cur_pc)
     );
@@ -126,12 +151,15 @@ module cpu#(parameter LEN = 32,
     
     reg_file u_reg_file(
     .clk       	(clk),
+    .rst        (rst),
     .rdy_in     (rdy_in),
+    .reg_ex_signal(reg_ex_signal),
     .rs1       	(rs1),
     .rs2       	(rs2),
     .wb_flag   	(wb_flag),
     .rd        	(rd_pos),
     .data      	(write_reg_data),
+    .reg_stall  (reg_stall),
     .rs1_data  	(rs1_data),
     .rs2_data  	(rs2_data)
     );
@@ -198,12 +226,14 @@ module cpu#(parameter LEN = 32,
     alu u_alu(
     .rst            (rst),
     .rdy_in         (rdy_in),
+    .alu_ex_signal  (alu_ex_signal),
     .rs1          	(o_rs1),
     .rs2          	(o_rs2),
     .imm          	(o_imm),
     .pc           	(id_ex_o_c_pc),
     .ex_stage_state (o_ex_stage_state),
     .opcode       	(o_opcode),
+    .alu_stall      (alu_stall),
     .result       	(result),
     .sign_bits    	(sign_bits)
     );

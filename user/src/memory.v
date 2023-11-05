@@ -11,13 +11,15 @@ module mem#(parameter ADDR_WIDTH = 17,
             input [ADDR_WIDTH-1:0] addr,
             input [LEN-1:0] mem_write,
             input [1:0] mem_stage_state,
+            output mem_stall,
             output[LEN-1:0] mem_read);
     
     reg [BYTE_SIZE-1:0] storage [0:2**ADDR_WIDTH-1];
     
     reg [ADDR_WIDTH-1:0] read_addr;
-    
-    assign mem_read = {storage[read_addr+3],storage[read_addr+2],storage[read_addr+1],storage[read_addr]};
+    reg flag         = 0;
+    assign mem_read  = {storage[read_addr+3],storage[read_addr+2],storage[read_addr+1],storage[read_addr]};
+    assign mem_stall = flag;
     
     // 4byte数据拆解
     wire [BYTE_SIZE-1:0] byte0, byte1, byte2, byte3;
@@ -42,15 +44,20 @@ module mem#(parameter ADDR_WIDTH = 17,
     always @(posedge clk) begin
         // read from memory
         if (mem_stage_state == `READ) begin
+            flag = 1;
             read_addr <= addr;
         end
         // write to memory
         else
         if (mem_stage_state == `WRITE) begin
+            flag = 1;
             storage[addr]   <= byte0;
             storage[addr+1] <= byte1;
             storage[addr+2] <= byte2;
             storage[addr+3] <= byte3;
+        end
+        else begin
+            flag = 0;
         end
     end
     

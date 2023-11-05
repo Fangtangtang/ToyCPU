@@ -29,6 +29,7 @@ module top#(parameter LEN = 32)
     wire cpu_rdy = 1;
     
     // outports wire
+    wire mem_stall;
     wire [LEN-1:0] mem_data;
     wire [MEM_ADDR_WIDTH-1:0] mem_addr;
     wire [LEN-1:0] write_data;
@@ -39,6 +40,7 @@ module top#(parameter LEN = 32)
     .clk         	    (clk),
     .rst         	    (rst),
     .rdy_in             (cpu_rdy),
+    .mem_stall          (mem_stall),
     .mem_data         	(mem_data),
     .mem_addr        	(mem_addr),
     .write_data      	(write_data),
@@ -54,6 +56,7 @@ module top#(parameter LEN = 32)
     .addr               (mem_addr),
     .mem_write          (write_data),
     .mem_stage_state    (mem_stage_state),
+    .mem_stall          (mem_stall),
     .mem_read           (mem_data)
     );
     
