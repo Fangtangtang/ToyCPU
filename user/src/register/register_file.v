@@ -35,7 +35,7 @@ module reg_file #(parameter LEN = 32)
                 reg2 <= register[rs2_index];
                 // write back
                 if (wb_flag == 1) begin
-                    register[rs1_index] <= data;
+                    register[rd] <= data;
                 end
             end
             else begin
