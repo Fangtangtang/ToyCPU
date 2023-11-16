@@ -8,82 +8,156 @@
 // 
 // cpu和memory交互的中间单元
 // 主要用于辨别取instruction还是data
-// 简易版，cashe size4
-// 倒计时取数据
+// 简易版(memory controler)，cashe size4
+// 状态机取数据
 // #############################################################################################################################
-
 `include "src_modified/defines.v"
+
 module CACHE#(parameter ADDR_WIDTH = 17,
               parameter LEN = 32,
               parameter BYTE_SIZE = 8)
              (input wire clk,
-              input [ADDR_WIDTH-1:0] addr,
+              input [ADDR_WIDTH-1:0] mem_inst_addr,     // instruction fetch
+              input inst_fetch_signal,
+              output reg [LEN-1:0] instruction,
+              input [ADDR_WIDTH-1:0] mem_data_addr,     // memory visit
               input [LEN-1:0] mem_write_data,
-              input [1:0] mem_signal,
-              input [BYTE_SIZE-1:0] mem_data,
-              output [LEN-1:0] instruction,
-              output [ADDR_WIDTH-1:0] mem_vis_addr, // 访存地址
-              output mem_vis_signal,                // 0:read, 1:write
-              output [LEN-1:0] mem_read_data,
-              output [BYTE_SIZE-1:0] writen_data,   // 写入memory的数据
-              output mem_vis_finished);
+              input [1:0] memory_vis_signal,
+              output reg [LEN-1:0] mem_read_data,
+              output reg [1:0] mem_vis_status,
+              input [BYTE_SIZE-1:0] mem_data,           // interact with main memory
+              output reg [BYTE_SIZE-1:0] writen_data,   // 写入memory的数据
+              output reg [ADDR_WIDTH-1:0] mem_vis_addr, // 访存地址
+              output [1:0] mem_vis_signal);
+    
+    // todo:merge storage and data?
     
     reg [BYTE_SIZE-1:0] storage [0:3];
+    reg [2:0] MEM_VIS_CNT = 0;
     
     reg [LEN-1:0] data;
-    reg [ADDR_WIDTH-1:0] first_address;
-    reg [ADDR_WIDTH-1:0] address;
-    reg [2:0] STATE_CTR = 0;
+    wire [BYTE_SIZE-1:0] byte0, byte1, byte2, byte3;
+    assign byte0 = data[7:0];
+    assign byte1 = data[15:8];
+    assign byte2 = data[23:16];
+    assign byte3 = data[31:24];
     
-    assign mem_vis_addr = address;
+    reg [ADDR_WIDTH-1:0] addr;
     
-    reg finished            = 0;
-    assign mem_vis_finished = finished;
-    
-    reg memory_vis_signal;
-    assign mem_signal = memory_vis_signal;
-    
-    always @(negedge clk) begin
-        if (finished)begin
-            finished <= 0;
-        end
-    end
+    reg [1:0] mem_vis_type = 0;
+    assign mem_vis_signal  = mem_vis_type;
     
     always @(posedge clk) begin
-        // 当前空闲
-        if (!STATE_CTR) begin
-            if (mem_signal == `MEM_NOP) begin
-                finished <= 1;
+        case (MEM_VIS_CNT)
+            // 刚开始访存
+            4:begin
+                MEM_VIS_CNT = MEM_VIS_CNT - 1;
+                mem_vis_status <= `WORKING;
+                // write
+                if (mem_vis_type == `WRITE) begin
+                    writen_data       = byte0;
+                    mem_vis_addr      = addr;
+                    // mem_vis_signal = `WRITE;
+                end
+                // read
+                else begin
+                    mem_vis_addr      = addr;
+                    // mem_vis_signal = `READ_DATA;
+                    storage[0] <= mem_data;
+                end
             end
-            else
-            begin
-                STATE_CTR     <= 4;
-                first_address <= addr;
-                case (mem_signal)
-                    `WRITE: begin
-                        memory_vis_signal <= 1;
-                        data              <= mem_write_data;
+            3:begin
+                MEM_VIS_CNT = MEM_VIS_CNT - 1;
+                mem_vis_status <= `WORKING;
+                // write
+                if (mem_vis_type == `WRITE) begin
+                    writen_data       = byte1;
+                    mem_vis_addr      = addr + 1;
+                    // mem_vis_signal = `WRITE;
+                end
+                // read
+                else begin
+                    mem_vis_addr      = addr + 1;
+                    // mem_vis_signal = `READ_DATA;
+                    storage[1] <= mem_data;
+                end
+            end
+            2:begin
+                MEM_VIS_CNT = MEM_VIS_CNT - 1;
+                mem_vis_status <= `WORKING;
+                // write
+                if (mem_vis_type == `WRITE) begin
+                    writen_data       = byte2;
+                    mem_vis_addr      = addr + 2;
+                    // mem_vis_signal = `WRITE;
+                end
+                // read
+                else begin
+                    mem_vis_addr      = addr + 2;
+                    // mem_vis_signal = `READ_DATA;
+                    storage[2] <= mem_data;
+                end
+            end
+            1:begin
+                MEM_VIS_CNT = MEM_VIS_CNT - 1;
+                // write
+                if (mem_vis_type == `WRITE) begin
+                    mem_vis_status <= `R_W_FINISHED;
+                    writen_data       = byte3;
+                    mem_vis_addr      = addr + 3;
+                    // mem_vis_signal = `WRITE;
+                end
+                // read
+                else if (mem_vis_type == `READ_DATA)begin
+                    mem_vis_status <= `R_W_FINISHED;
+                    mem_vis_addr      = addr + 3;
+                    // mem_vis_signal = `READ_DATA;
+                    storage[3] <= mem_data;
+                    mem_read_data = {storage[3],storage[2],storage[1],storage[0]};
+                end
+                else if (mem_vis_type == `READ_INST) begin
+                    mem_vis_status <= `IF_FINISHED;
+                    mem_vis_addr      = addr + 3;
+                    // mem_vis_signal = `READ_DATA;
+                    storage[3] <= mem_data;
+                    instruction = {storage[3],storage[2],storage[1],storage[0]};
+                end
+            end
+            0:begin
+                if (mem_vis_type == `MEM_NOP) begin
+                    if (inst_fetch_signal) begin
+                        mem_vis_type = `READ_INST;
+                        addr         = mem_inst_addr;
+                        MEM_VIS_CNT  = 4;
+                        mem_vis_status <= `WORKING;
                     end
-                    `READ_DATA:begin
-                        memory_vis_signal <= 0;
+                    else begin
+                        case (memory_vis_signal)
+                            `READ_DATA:begin
+                                mem_vis_type <= `READ_DATA;
+                                addr        = mem_data_addr;
+                                MEM_VIS_CNT = 4;
+                                mem_vis_status <= `WORKING;
+                            end
+                            `WRITE:begin
+                                mem_vis_type <= `WRITE;
+                                addr        = mem_data_addr;
+                                data        = mem_write_data;
+                                MEM_VIS_CNT = 4;
+                                mem_vis_status <= `WORKING;
+                            end
+                        endcase
                     end
-                    `READ_INST:begin
-                        memory_vis_signal <= 0;
-                    end
-                    default:
-                    $display("[ERROR]:unexpected mem_signal\n");
-                endcase
+                end
+                else begin
+                    mem_vis_type = `MEM_NOP;
+                    mem_vis_status <= `RESTING;
+                end
             end
-        end
-        else begin // 访存工作中
-            if (STATE_CTR == 4) begin
-                
-            end
-            
-            else
-            if (STATE_CTR == 3) begin
-                
-            end
-        end
+            default:
+            $display("[ERROR]:unexpected counter\n");
+        endcase
     end
+    
+    
 endmodule

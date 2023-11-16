@@ -7,7 +7,7 @@
 // 
 // 接口说明：
 // - 外部总控制信号：clk,rst,rdy_in
-// - 与memory(cache)交互接口：instruction,mem_read_data,mem_vis_finished,mem_write_data,mem_addr,mem_vis_signal
+// - 与memory(cache)交互接口：instruction,mem_read_data,mem_vis_status,mem_write_data,mem_addr,mem_vis_signal
 // 
 // module说明：
 // - ALU：计算专用
@@ -28,10 +28,12 @@ module CPU#(parameter LEN = 32,
             input rdy_in,
             input [LEN-1:0] instruction,
             input [LEN-1:0] mem_read_data,
-            input mem_vis_finished,           // 访存状态
+            input [1:0] mem_vis_status,            // 访存状态
             output [LEN-1:0] mem_write_data,
-            output [ADDR_WIDTH-1:0] mem_addr, // pc/adddr
-            output [1:0] mem_signal);
+            output [ADDR_WIDTH-1:0] mem_inst_addr, // pc
+            output [ADDR_WIDTH-1:0] mem_data_addr, // addr
+            output inst_fetch_signal,
+            output [1:0] memory_vis_signal);
     
     // REGISTER
     // ---------------------------------------------------------------------------------------------
@@ -195,54 +197,35 @@ module CPU#(parameter LEN = 32,
         end
     end
     
-    // MEM MUX
+    // MEM VISIT
     // ---------------------------------------------------------------------------------------------
-    // 组合逻辑
     // todo:当memory被占用时,如何stall
     
-    reg [ADDR_WIDTH-1:0]    addr;
-    reg [1:0]               memory_vis_signal;
+    assign mem_inst_addr     = PC[ADDR_WIDTH-1:0];
+    assign inst_fetch_signal = IF_STATE_CTR;        // todo
     
-    assign mem_addr       = addr;
-    assign mem_signal     = memory_vis_signal;
+    assign mem_data_addr     = EXE_MEM_RESULT[ADDR_WIDTH-1:0];
+    assign memory_vis_signal = MEM_STATE_CTR ? EXE_MEM_MEM_VIS_SIGNAL:`MEM_NOP;
+    
     assign mem_write_data = EXE_MEM_RS2;
     
-    always @(*) begin
-        if (IF_STATE_CTR > 0) begin
-            addr              = PC[ADDR_WIDTH-1:0];
-            memory_vis_signal = 2'b11; // READ_INST
-        end
-        else
-        
-        if (MEM_STATE_CTR > 0) begin
-            addr              = EXE_MEM_RESULT[ADDR_WIDTH-1:0];
-            memory_vis_signal = EXE_MEM_MEM_VIS_SIGNAL;
-        end
-        else begin
-            memory_vis_signal = `MEM_NOP;
-        end
-    end
     
     
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // PIPELINE
     // 每一个stage,从上面的transfer register继承的值可靠
-    // 本阶段组合逻辑得到的结果不一定可靠,等待一个周期
+    // 本阶段组合逻辑得到的结果不一定可靠,等待一个周期?
     
     // STATE CONTROLER
     // 
-    // 实际为倒计时器
-    // 每个阶段执行时间为1clk
+    // stall or not
     // 可能因为访存等原因stall
-    // - 前一阶段为1,stall显示finish,后一阶段prepare
-    // - 本阶段为1,执行本阶段操作
-    // - 一般由前一阶段控制
     
     reg         IF_STATE_CTR  = 0;
-    reg [1:0]   ID_STATE_CTR  = 0;
-    reg [1:0]   EXE_STATE_CTR = 0;
-    reg [1:0]   MEM_STATE_CTR = 0;
-    reg [1:0]   WB_STATE_CTR  = 0;
+    reg         ID_STATE_CTR  = 0;
+    reg         EXE_STATE_CTR = 0;
+    reg         MEM_STATE_CTR = 0;
+    reg         WB_STATE_CTR  = 0;
     
     // REGISTER FILE
     // ----------------------------------------------------------------------------
@@ -250,7 +233,7 @@ module CPU#(parameter LEN = 32,
     reg [LEN-1:0]           reg_write_data;
     wire [LEN-1:0]          rs1_value;
     wire [LEN-1:0]          rs2_value;
-    wire                    rf_finished;
+    // wire                    rf_finished;
     
     REG_FILE reg_file(
     .clk            (clk),
@@ -262,8 +245,8 @@ module CPU#(parameter LEN = 32,
     .rd             (MEM_WB_RD_INDEX),
     .data           (reg_write_data),
     .rs1_data       (rs1_value),
-    .rs2_data       (rs2_value),
-    .rf_vis_finished(rf_finished)
+    .rs2_data       (rs2_value)
+    // .rf_vis_finished(rf_finished)
     );
     
     // IMMIDIATE GENETATOR
@@ -292,12 +275,15 @@ module CPU#(parameter LEN = 32,
     );
     
     
-    // rst下降沿,整体开始运转
+    // rst为1，整体开始工作
     // -------------------------------------------------------------------------------
-    always @(negedge rst) begin
-        if (rdy_in) begin
-            IF_STATE_CTR <= 1;
-        end
+    reg chip_enable;
+    
+    always @ (posedge clk) begin
+        if (rst == 0)
+            chip_enable <= 0;
+        else
+            chip_enable <= 1;
     end
     
     // STAGE1 : INSTRUCTION FETCH
@@ -306,20 +292,26 @@ module CPU#(parameter LEN = 32,
     // ---------------------------------------------------------------------------------------------
     
     always @(posedge clk) begin
-        // initialize
-        if (rst)begin
-            PC           <= 0;
-            IF_STATE_CTR <= 0;
-        end
-        else
-        
         if (rdy_in) begin
-            if (IF_STATE_CTR) begin
-                IF_ID_PC <= PC;
-                if (mem_vis_finished) begin
-                    IF_STATE_CTR <= 0;
-                    ID_STATE_CTR <= 2;
+            if (chip_enable) begin
+                if (IF_STATE_CTR) begin
+                    if (mem_vis_status == `RESTING) begin
+                        IF_ID_PC <= PC;
+                    end
+                    // IF没有结束，向下加stall
+                    if (mem_vis_status == `IF_FINISHED) begin
+                        ID_STATE_CTR <= 1;
+                    end
+                    else begin
+                        ID_STATE_CTR <= 0;
+                    end
                 end
+                else begin
+                    ID_STATE_CTR <= 0;
+                end
+            end
+            else begin
+                PC = 0;
             end
         end
     end
@@ -331,13 +323,9 @@ module CPU#(parameter LEN = 32,
     // ---------------------------------------------------------------------------------------------
     always @(posedge clk) begin
         if ((!rst)&&rdy_in) begin
-            if (ID_STATE_CTR == 2) begin
+            if (ID_STATE_CTR) begin
                 ID_EXE_PC <= IF_ID_PC;
-                rf_signal    = 2'b01;
-                ID_STATE_CTR = ID_STATE_CTR - 1;
-            end
-            // 等待一周期确保更新完全
-            if (ID_STATE_CTR == 1) begin
+                rf_signal = 2'b01;
                 ID_EXE_RD_INDEX       <= rd_index;
                 ID_EXE_ALU_SIGNAL     <= alu_signal;
                 ID_EXE_FUNC_CODE      <= func_code;
@@ -345,12 +333,17 @@ module CPU#(parameter LEN = 32,
                 ID_EXE_MEM_VIS_SIGNAL <= mem_vis_signal;
                 ID_EXE_WB_SIGNAL      <= wb_signal;
                 ID_EXE_IMM            <= immediate;
-                if (rf_finished) begin
-                    ID_EXE_RS1    <= rs1_value;
-                    ID_EXE_RS2    <= rs2_value;
-                    ID_STATE_CTR  <= 0;
-                    EXE_STATE_CTR <= 2;
-                end
+                // if (rf_finished) begin
+                ID_EXE_RS1    <= rs1_value;
+                ID_EXE_RS2    <= rs2_value;
+                EXE_STATE_CTR <= 1;
+                // end
+                // else begin
+                // EXE_STATE_CTR <= 0;
+                // end
+            end
+            else begin
+                EXE_STATE_CTR <= 0;
             end
         end
     end
@@ -360,7 +353,7 @@ module CPU#(parameter LEN = 32,
     // ---------------------------------------------------------------------------------------------
     always @(posedge clk) begin
         if ((!rst)&&rdy_in)begin
-            if (EXE_STATE_CTR == 2) begin
+            if (EXE_STATE_CTR) begin
                 EXE_MEM_PC             <= ID_EXE_PC;
                 EXE_MEM_RD_INDEX       <= ID_EXE_RD_INDEX;
                 EXE_MEM_FUNC_CODE      <= ID_EXE_FUNC_CODE;
@@ -369,14 +362,12 @@ module CPU#(parameter LEN = 32,
                 EXE_MEM_WB_SIGNAL      <= ID_EXE_WB_SIGNAL;
                 EXE_MEM_IMM            <= ID_EXE_IMM;
                 EXE_MEM_RS2            <= ID_EXE_RS2;
-                EXE_STATE_CTR = EXE_STATE_CTR - 1;
+                EXE_MEM_RESULT         <= alu_result;
+                EXE_MEM_ZERO_BITS      <= sign_bits;
+                MEM_STATE_CTR          <= 1;
             end
-            
-            if (EXE_STATE_CTR == 1) begin
-                EXE_MEM_RESULT    <= alu_result;
-                EXE_MEM_ZERO_BITS <= sign_bits;
-                EXE_STATE_CTR     <= 0;
-                MEM_STATE_CTR     <= 1;
+            else begin
+                MEM_STATE_CTR <= 0;
             end
         end
     end
@@ -437,16 +428,8 @@ module CPU#(parameter LEN = 32,
     // memory visit
     always @(posedge clk) begin
         if ((!rst)&&rdy_in) begin
-            if (MEM_STATE_CTR == 2) begin
-                MEM_WB_PC        <= EXE_MEM_PC;
-                MEM_WB_RD_INDEX  <= EXE_MEM_RD_INDEX;
-                MEM_WB_WB_SIGNAL <= EXE_MEM_WB_SIGNAL;
-                MEM_WB_RESULT    <= EXE_MEM_RESULT;
-                MEM_STATE_CTR = MEM_STATE_CTR-1;
-            end
-            
-            if (MEM_STATE_CTR == 1) begin
-                if (mem_vis_finished) begin
+            if (MEM_STATE_CTR) begin
+                if (mem_vis_status == `RESTING) begin
                     // update pc
                     if (branch_flag) begin
                         PC <= special_pc;
@@ -454,11 +437,23 @@ module CPU#(parameter LEN = 32,
                     else begin
                         PC <= increased_pc;
                     end
-                    // data from memmory
-                    MEM_WB_MEM_DATA <= mem_read_data;
-                    MEM_STATE_CTR   <= 0;
-                    WB_STATE_CTR    <= 2;
+                    MEM_WB_PC        <= EXE_MEM_PC;
+                    MEM_WB_RD_INDEX  <= EXE_MEM_RD_INDEX;
+                    MEM_WB_WB_SIGNAL <= EXE_MEM_WB_SIGNAL;
+                    MEM_WB_RESULT    <= EXE_MEM_RESULT;
                 end
+                
+                if ((EXE_MEM_MEM_VIS_SIGNAL == `MEM_NOP)||mem_vis_status == `R_W_FINISHED) begin
+                // data from memmory
+                    MEM_WB_MEM_DATA <= mem_read_data;
+                    WB_STATE_CTR    <= 1;
+                    end
+                else begin
+                    WB_STATE_CTR <= 0;
+                end
+            end
+            else begin
+                WB_STATE_CTR <= 0;
             end
         end
     end
@@ -492,22 +487,14 @@ module CPU#(parameter LEN = 32,
     
     always @(posedge clk) begin
         if ((!rst)&&rdy_in)begin
-            if (WB_STATE_CTR == 2) begin
+            if (WB_STATE_CTR)begin
                 if (rb_flag) begin
-                    rf_signal    = 2'b10;
-                    WB_STATE_CTR = WB_STATE_CTR - 1;
+                    rf_signal = 2'b10;
                 end
-                else begin
-                    WB_STATE_CTR <= 0;
-                    IF_STATE_CTR <= 1;
-                end
+                IF_STATE_CTR <= 1;
             end
-            
-            if (WB_STATE_CTR == 1) begin
-                if (mem_vis_finished) begin
-                    WB_STATE_CTR <= 0;
-                    IF_STATE_CTR <= 1;
-                end
+            else begin
+                IF_STATE_CTR <= 0;
             end
         end
     end
