@@ -18,9 +18,10 @@ module CACHE#(parameter ADDR_WIDTH = 17,
               parameter BYTE_SIZE = 8)
              (input wire clk,
               input [ADDR_WIDTH-1:0] mem_inst_addr,   // instruction fetch
-              input inst_fetch_signal,
+              input inst_fetch_enabled,
               output reg [LEN-1:0] instruction,
               input [ADDR_WIDTH-1:0] mem_data_addr,   // memory visit
+              input mem_vis_enabled,
               input [LEN-1:0] mem_write_data,
               input [1:0] memory_vis_signal,
               output reg [LEN-1:0] mem_read_data,
@@ -58,16 +59,11 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 // write
                 if (mem_vis_type == `WRITE) begin
                     writen_data = byte0;
-                    addr <= addr+1;
+                    addr <= addr + 1;
                 end
                 // read
                 else begin
-                    addr <= addr+1;
-                    // mem_vis_addr   = addr;
-                    // mem_vis_signal = `READ_DATA;
-                    // storage[0]     = mem_data;
-                    // $monitor("%b",mem_data);
-
+                    addr <= addr + 1;
                 end
             end
             4:begin
@@ -76,18 +72,12 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 // write
                 if (mem_vis_type == `WRITE) begin
                     writen_data = byte1;
-                    addr <= addr+1;
-                    // mem_vis_addr   = addr + 1;
-                    // mem_vis_signal = `WRITE;
+                    addr <= addr + 1;
                 end
                 // read
                 else begin
                     addr <= addr+1;
-                    // mem_vis_addr   = addr + 1;
-                    // mem_vis_signal = `READ_DATA;
-                    // storage[1]     = mem_data;
                     storage[0] = mem_data;
-
                 end
             end
             3:begin
@@ -97,19 +87,11 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 if (mem_vis_type == `WRITE) begin
                     writen_data = byte2;
                     addr <= addr+1;
-                    // mem_vis_addr   = addr + 2;
-                    // mem_vis_signal = `WRITE;
-                
                 end
                 // read
                 else begin
                     addr <= addr+1;
-                    // mem_vis_addr   = addr + 2;
-                    // mem_vis_signal = `READ_DATA;
-                    // storage[2]     = mem_data;
                     storage[1] = mem_data;
-                    // $display("%b",mem_data);
-                    
                 end
             end
             2:begin
@@ -117,9 +99,7 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 // write
                 if (mem_vis_type == `WRITE) begin
                     mem_vis_status <= `R_W_FINISHED;
-                    writen_data       = byte3;
-                    // mem_vis_addr   = addr + 3;
-                    // mem_vis_signal = `WRITE;
+                    writen_data = byte3;
                 end
                 // read
                 else begin
@@ -130,7 +110,7 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 MEM_VIS_CNT = MEM_VIS_CNT - 1;
                 if (mem_vis_type == `WRITE) begin
                     mem_vis_status <= `R_W_FINISHED;
-                    writen_data       = byte3;
+                    writen_data = byte3;
                 end
                 else if (mem_vis_type == `READ_DATA)begin
                     mem_vis_status <= `R_W_FINISHED;
@@ -146,15 +126,21 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 end
             end
             0:begin
+                // todo 逻辑错误
                 if (mem_vis_type == `MEM_NOP) begin
-                    if (inst_fetch_signal) begin
+                    if (inst_fetch_enabled) begin
                         mem_vis_type = `READ_INST;
                         addr         = mem_inst_addr;
                         MEM_VIS_CNT  = 5;
                         mem_vis_status <= `WORKING;
                     end
-                    else begin
+                    else if (mem_vis_enabled) begin
                         case (memory_vis_signal)
+                            `MEM_NOP:begin
+                                mem_vis_type <= `READ_DATA; // 形式记号
+                                MEM_VIS_CNT = 0;
+                                mem_vis_status <= `R_W_FINISHED;
+                            end
                             `READ_DATA:begin
                                 mem_vis_type <= `READ_DATA;
                                 addr        = mem_data_addr;

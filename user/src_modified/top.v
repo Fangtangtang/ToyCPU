@@ -14,7 +14,7 @@ module top#(parameter LEN = 32)
     
     reg rst;
     reg rst_delay;
-
+    
     always @(posedge clk or posedge btnC)
     begin
         if (btnC)
@@ -37,7 +37,8 @@ module top#(parameter LEN = 32)
     wire [LEN-1:0] mem_write_data;
     wire [ADDR_WIDTH-1:0] mem_inst_addr;
     wire [ADDR_WIDTH-1:0] mem_data_addr;
-    wire inst_fetch_signal;
+    wire inst_fetch_enabled;
+    wire mem_vis_enabled;
     wire [1:0] memory_vis_signal;
     
     CPU #(.LEN(LEN),
@@ -52,7 +53,8 @@ module top#(parameter LEN = 32)
     .mem_write_data(mem_write_data),
     .mem_inst_addr(mem_inst_addr),
     .mem_data_addr(mem_data_addr),
-    .inst_fetch_signal(inst_fetch_signal),
+    .inst_fetch_enabled(inst_fetch_enabled),
+    .mem_vis_enabled(mem_vis_enabled),
     .memory_vis_signal(memory_vis_signal)
     );
     
@@ -64,9 +66,10 @@ module top#(parameter LEN = 32)
     CACHE cache(
     .clk(clk),
     .mem_inst_addr(mem_inst_addr),
-    .inst_fetch_signal(inst_fetch_signal),
+    .inst_fetch_enabled(inst_fetch_enabled),
     .instruction(instruction),
     .mem_data_addr(mem_data_addr),
+    .mem_vis_enabled(mem_vis_enabled),
     .mem_write_data(mem_write_data),
     .memory_vis_signal(memory_vis_signal),
     .mem_read_data(mem_read_data),

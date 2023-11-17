@@ -58,6 +58,5 @@
 `define     INCREASED_PC            2'b11
 
 // Reg File 访问信号
-`define     RF_NOP                  2'b00
-`define     RF_READ                 2'b01
-`define     RF_WRITE                2'b10
+`define     RF_NOP                  1'b0
+`define     RF_WRITE                1'b1

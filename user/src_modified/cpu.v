@@ -32,7 +32,8 @@ module CPU#(parameter LEN = 32,
             output [LEN-1:0] mem_write_data,
             output [ADDR_WIDTH-1:0] mem_inst_addr, // pc
             output [ADDR_WIDTH-1:0] mem_data_addr, // addr
-            output inst_fetch_signal,
+            output inst_fetch_enabled,
+            output mem_vis_enabled,
             output [1:0] memory_vis_signal);
     
     // REGISTER
@@ -96,7 +97,7 @@ module CPU#(parameter LEN = 32,
     
     wire special_func_code = func_code == 4'b0001||func_code == 4'b0101||func_code == 4'b1101;
     assign R_type          = (opcode == 7'b0110011)||(opcode == 7'b0010011&&special_func_code);
-    assign I_type          = (opcode == 7'b0110011&&(!special_func_code))||(opcode == 7'b0000011)||(opcode == 7'b1100111&&func_code[2:0] == 3'b000);
+    assign I_type          = (opcode == 7'b0010011&&(!special_func_code))||(opcode == 7'b0000011)||(opcode == 7'b1100111&&func_code[2:0] == 3'b000);
     assign S_type          = opcode == 7'b0100011;
     assign B_type          = opcode == 7'b1100011;
     assign U_type          = opcode == 7'b0110111||opcode == 7'b0010111;
@@ -114,13 +115,13 @@ module CPU#(parameter LEN = 32,
                 7'b0110011: begin
                     alu_signal     = `BINARY;
                     mem_vis_signal = `MEM_NOP;
-                    branch_signal  = 2'b00;
+                    branch_signal  = `NOT_BRANCH;
                     wb_signal      = `ARITH;
                 end
                 7'b0010011: begin
                     alu_signal     = `IMM_BINARY;
                     mem_vis_signal = `MEM_NOP;
-                    branch_signal  = 2'b00;
+                    branch_signal  = `NOT_BRANCH;
                     wb_signal      = `ARITH;
                 end
                 default:
@@ -132,19 +133,20 @@ module CPU#(parameter LEN = 32,
                 7'b0010011: begin
                     alu_signal     = `IMM_BINARY;
                     mem_vis_signal = `MEM_NOP;
-                    branch_signal  = 2'b00;
+                    branch_signal  = `NOT_BRANCH;
                     wb_signal      = `ARITH;
                 end
                 7'b0000011:begin
                     alu_signal     = `MEM_ADDR;
                     mem_vis_signal = `READ_DATA;
-                    branch_signal  = 2'b00;
+                    branch_signal  = `NOT_BRANCH;
                     wb_signal      = `MEM_TO_REG;
                 end
+                // jalr
                 7'b1100111:begin
                     alu_signal     = `MEM_ADDR;
                     mem_vis_signal = `MEM_NOP;
-                    branch_signal  = 2'b01;
+                    branch_signal  = `UNCONDITIONAL_RESULT;
                     wb_signal      = `INCREASED_PC;
                 end
                 default:
@@ -156,7 +158,7 @@ module CPU#(parameter LEN = 32,
         if (S_type) begin
             alu_signal     = `MEM_ADDR;
             mem_vis_signal = `WRITE;
-            branch_signal  = 2'b00;
+            branch_signal  = `NOT_BRANCH;
             wb_signal      = `WB_NOP;
         end
         else
@@ -164,7 +166,7 @@ module CPU#(parameter LEN = 32,
         if (B_type) begin
             alu_signal     = `BRANCH_COND;
             mem_vis_signal = `MEM_NOP;
-            branch_signal  = 2'b10;
+            branch_signal  = `CONDITIONAL;
             wb_signal      = `WB_NOP;
         end
         else
@@ -174,7 +176,7 @@ module CPU#(parameter LEN = 32,
                 7'b0110111:begin
                     alu_signal     = `IMM;
                     mem_vis_signal = `MEM_NOP;
-                    branch_signal  = 2'b00;
+                    branch_signal  = `NOT_BRANCH;
                     wb_signal      = `ARITH;
                 end
                 7'b0010111:begin
@@ -190,10 +192,10 @@ module CPU#(parameter LEN = 32,
         else
         
         if (J_type) begin
-            alu_signal     = `ALU_NOP;
+            alu_signal     = `PC_BASED;
             mem_vis_signal = `MEM_NOP;
-            branch_signal  = 2'b11;
-            wb_signal      = `WB_NOP;
+            branch_signal  = `UNCONDITIONAL;
+            wb_signal      = `INCREASED_PC;
         end
     end
     
@@ -201,8 +203,9 @@ module CPU#(parameter LEN = 32,
     // ---------------------------------------------------------------------------------------------
     // todo:当memory被占用时,如何stall
     
-    assign mem_inst_addr     = PC[ADDR_WIDTH-1:0];
-    assign inst_fetch_signal = IF_STATE_CTR;        // todo
+    assign mem_inst_addr      = PC[ADDR_WIDTH-1:0];
+    assign inst_fetch_enabled = IF_STATE_CTR;
+    assign mem_vis_enabled    = MEM_STATE_CTR;
     
     assign mem_data_addr     = EXE_MEM_RESULT[ADDR_WIDTH-1:0];
     assign memory_vis_signal = MEM_STATE_CTR ? EXE_MEM_MEM_VIS_SIGNAL:`MEM_NOP;
@@ -229,11 +232,10 @@ module CPU#(parameter LEN = 32,
     
     // REGISTER FILE
     // ----------------------------------------------------------------------------
-    reg [1:0]               rf_signal;
+    reg                     rf_signal;
     reg [LEN-1:0]           reg_write_data;
     wire [LEN-1:0]          rs1_value;
     wire [LEN-1:0]          rs2_value;
-    // wire                    rf_finished;
     
     REG_FILE reg_file(
     .clk            (clk),
@@ -301,7 +303,7 @@ module CPU#(parameter LEN = 32,
         if (rdy_in) begin
             if (chip_enable&&start_cpu) begin
                 if (IF_STATE_CTR) begin
-                        IF_ID_PC <= PC;
+                    IF_ID_PC <= PC;
                 end
                 // IF没有结束，向下加stall
                 if (mem_vis_status == `IF_FINISHED) begin
@@ -310,9 +312,6 @@ module CPU#(parameter LEN = 32,
                 else begin
                     ID_STATE_CTR <= 0;
                 end
-                // else begin
-                // ID_STATE_CTR <= 0;
-                // end
             end
             else begin
                 PC = 0;
@@ -337,10 +336,9 @@ module CPU#(parameter LEN = 32,
                 ID_EXE_MEM_VIS_SIGNAL <= mem_vis_signal;
                 ID_EXE_WB_SIGNAL      <= wb_signal;
                 ID_EXE_IMM            <= immediate;
-                // if (rf_finished) begin
-                ID_EXE_RS1    <= rs1_value;
-                ID_EXE_RS2    <= rs2_value;
-                EXE_STATE_CTR <= 1;
+                ID_EXE_RS1            <= rs1_value; // 时间有误，存到了旧的数据
+                ID_EXE_RS2            <= rs2_value;
+                EXE_STATE_CTR         <= 1;
                 // end
                 // else begin
                 // EXE_STATE_CTR <= 0;
@@ -433,7 +431,7 @@ module CPU#(parameter LEN = 32,
     always @(posedge clk) begin
         if ((!rst)&&rdy_in&&start_cpu) begin
             if (MEM_STATE_CTR) begin
-
+                
                 if (mem_vis_status == `RESTING) begin
                     // update pc
                     if (branch_flag) begin
@@ -448,14 +446,20 @@ module CPU#(parameter LEN = 32,
                     MEM_WB_RESULT    <= EXE_MEM_RESULT;
                 end
                 
-                if ((EXE_MEM_MEM_VIS_SIGNAL == `MEM_NOP)||mem_vis_status == `R_W_FINISHED) begin
+                // if ((EXE_MEM_MEM_VIS_SIGNAL == `MEM_NOP)||mem_vis_status == `R_W_FINISHED) begin
+                // // data from memmory
+                // MEM_WB_MEM_DATA <= mem_read_data;
+                // WB_STATE_CTR    <= 1;
+                // end
+                // else begin
+                // WB_STATE_CTR <= 0;
+                // end
+            end
+            
+            if (mem_vis_status == `R_W_FINISHED) begin
                 // data from memmory
-                    MEM_WB_MEM_DATA <= mem_read_data;
-                    WB_STATE_CTR    <= 1;
-                    end
-                else begin
-                    WB_STATE_CTR <= 0;
-                end
+                MEM_WB_MEM_DATA <= mem_read_data;
+                WB_STATE_CTR    <= 1;
             end
             else begin
                 WB_STATE_CTR <= 0;
@@ -494,8 +498,9 @@ module CPU#(parameter LEN = 32,
         if ((!rst)&&rdy_in&&start_cpu)begin
             if (WB_STATE_CTR)begin
                 if (rb_flag) begin
-                    rf_signal = 2'b10;
+                    rf_signal = `RF_WRITE;
                 end
+                else rf_signal = `RF_NOP;
                 IF_STATE_CTR <= 1;
             end
             else begin

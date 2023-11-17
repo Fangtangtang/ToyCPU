@@ -2,3 +2,4 @@ testspace
 script
 testcase
 doc
+*.out
