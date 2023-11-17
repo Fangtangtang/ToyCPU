@@ -34,12 +34,12 @@ module IMMEDIATE_GENETATOR#(parameter LEN = 32)
     // MUX to select
     always @(*) begin
         case (inst_type)
-            6'b000001: immediate = R_imm;
-            6'b000010:immediate  = I_imm;
-            6'b000100:immediate  = S_imm;
-            6'b001000:immediate  = B_imm;
-            6'b010000:immediate  = U_imm;
-            6'b100000:immediate  = J_imm;
+            6'b100000:immediate = R_imm;
+            6'b010000:immediate = I_imm;
+            6'b001000:immediate = S_imm;
+            6'b000100:immediate = B_imm;
+            6'b000010:immediate = U_imm;
+            6'b000001:immediate = J_imm;
             default:
             $display("[ERROR]:multiple inst_type\n");
         endcase

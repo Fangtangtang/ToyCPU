@@ -9,11 +9,12 @@ module top#(parameter LEN = 32)
            (input wire clk,
             input wire btnC);
     
-    localparam MEM_ADDR_WIDTH = 17;
+    localparam ADDR_WIDTH = 17;
+    localparam BYTE_SIZE  = 8;
     
     reg rst;
     reg rst_delay;
-    
+
     always @(posedge clk or posedge btnC)
     begin
         if (btnC)
@@ -39,7 +40,9 @@ module top#(parameter LEN = 32)
     wire inst_fetch_signal;
     wire [1:0] memory_vis_signal;
     
-    CPU cpu(
+    CPU #(.LEN(LEN),
+    .ADDR_WIDTH(ADDR_WIDTH))
+    cpu(
     .clk(clk),
     .rst(rst),
     .rdy_in(cpu_rdy),
@@ -57,7 +60,7 @@ module top#(parameter LEN = 32)
     wire [BYTE_SIZE-1:0] writen_data;
     wire [ADDR_WIDTH-1:0] mem_vis_addr;
     wire [1:0] mem_vis_signal;
-
+    
     CACHE cache(
     .clk(clk),
     .mem_inst_addr(mem_inst_addr),
@@ -73,13 +76,13 @@ module top#(parameter LEN = 32)
     .mem_vis_addr(mem_vis_addr),
     .mem_vis_signal(mem_vis_signal)
     );
-
+    
     MAIN_MEMORY main_memory(
-        .clk(clk),
-        .writen_data(writen_data),
-        .mem_vis_addr(mem_vis_addr),
-        .mem_vis_signal(mem_vis_signal),
-        .mem_data(mem_data)
+    .clk(clk),
+    .writen_data(writen_data),
+    .mem_vis_addr(mem_vis_addr),
+    .mem_vis_signal(mem_vis_signal),
+    .mem_data(mem_data)
     );
     
 endmodule

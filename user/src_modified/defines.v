@@ -40,8 +40,8 @@
 // ----------------------------------------------------------
 `define     RESTING                 2'b00
 `define     WORKING                 2'b01
-`define     IF_FINISHED             2'b00
-`define     R_W_FINISHED            2'b00
+`define     IF_FINISHED             2'b10
+`define     R_W_FINISHED            2'b11
 
 // BRANCH
 // ----------------------------------------------------------

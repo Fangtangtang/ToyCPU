@@ -3,7 +3,7 @@
 // for simulation only
 // #############################################################################################################################
 
-`include"src/raw_top.v"
+`include "src_modified/top.v"
 
 `timescale 1ns/1ps
 

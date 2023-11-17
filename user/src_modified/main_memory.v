@@ -16,9 +16,12 @@ module MAIN_MEMORY#(parameter ADDR_WIDTH = 17,
                     input [BYTE_SIZE-1:0] writen_data,
                     input [ADDR_WIDTH-1:0] mem_vis_addr,
                     input [1:0] mem_vis_signal,
-                    output reg [BYTE_SIZE-1:0] mem_data);
+                    output [BYTE_SIZE-1:0] mem_data);
+                    
     reg [BYTE_SIZE-1:0] storage [0:2**ADDR_WIDTH-1];
-    
+    reg [BYTE_SIZE-1:0] read_data;
+
+    assign mem_data = read_data;
     // 编译为二进制的测试点命名为test.data
     initial begin
         for (integer i = 0;i<2**ADDR_WIDTH;i = i+1) begin
@@ -27,15 +30,13 @@ module MAIN_MEMORY#(parameter ADDR_WIDTH = 17,
         $readmemh("/mnt/f/repo/ToyCPU/user/testspace/test.data", storage);
     end
     
-    always @(*) begin
-        if (mem_vis_signal == `READ_DATA||mem_vis_signal == `READ_INST) begin
-            mem_data = storage[mem_vis_addr];
-        end
-    end
-    
     always @(posedge clk) begin
         if (mem_vis_signal == `WRITE) begin
             storage[mem_vis_addr] <= writen_data;
         end
+            if (mem_vis_signal == `READ_DATA||mem_vis_signal == `READ_INST) begin
+                read_data <= storage[mem_vis_addr];
+            end
     end
+    
 endmodule

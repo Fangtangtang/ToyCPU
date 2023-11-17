@@ -100,7 +100,7 @@ module CPU#(parameter LEN = 32,
     assign S_type          = opcode == 7'b0100011;
     assign B_type          = opcode == 7'b1100011;
     assign U_type          = opcode == 7'b0110111||opcode == 7'b0010111;
-    assign J_type          = opcode == 7'b1101111&&(!func_code[2:0] == 3'b000);
+    assign J_type          = opcode == 7'b1101111&&(func_code[2:0] == 3'b000);
     
     reg [2:0]       alu_signal;
     reg [1:0]       mem_vis_signal;
@@ -278,12 +278,18 @@ module CPU#(parameter LEN = 32,
     // rst为1，整体开始工作
     // -------------------------------------------------------------------------------
     reg chip_enable;
+    reg start_cpu = 0;
     
     always @ (posedge clk) begin
-        if (rst == 0)
-            chip_enable <= 0;
-        else
+        if (rst == 0) begin
+            if (!start_cpu) begin
+                IF_STATE_CTR <= 1;
+                start_cpu    <= 1;
+            end
             chip_enable <= 1;
+        end
+        else
+            chip_enable <= 0;
     end
     
     // STAGE1 : INSTRUCTION FETCH
@@ -293,22 +299,20 @@ module CPU#(parameter LEN = 32,
     
     always @(posedge clk) begin
         if (rdy_in) begin
-            if (chip_enable) begin
+            if (chip_enable&&start_cpu) begin
                 if (IF_STATE_CTR) begin
-                    if (mem_vis_status == `RESTING) begin
                         IF_ID_PC <= PC;
-                    end
-                    // IF没有结束，向下加stall
-                    if (mem_vis_status == `IF_FINISHED) begin
-                        ID_STATE_CTR <= 1;
-                    end
-                    else begin
-                        ID_STATE_CTR <= 0;
-                    end
+                end
+                // IF没有结束，向下加stall
+                if (mem_vis_status == `IF_FINISHED) begin
+                    ID_STATE_CTR <= 1;
                 end
                 else begin
                     ID_STATE_CTR <= 0;
                 end
+                // else begin
+                // ID_STATE_CTR <= 0;
+                // end
             end
             else begin
                 PC = 0;
@@ -322,7 +326,7 @@ module CPU#(parameter LEN = 32,
     // 更新transfer register
     // ---------------------------------------------------------------------------------------------
     always @(posedge clk) begin
-        if ((!rst)&&rdy_in) begin
+        if ((!rst)&&rdy_in&&start_cpu) begin
             if (ID_STATE_CTR) begin
                 ID_EXE_PC <= IF_ID_PC;
                 rf_signal = 2'b01;
@@ -352,7 +356,7 @@ module CPU#(parameter LEN = 32,
     // - alu执行运算
     // ---------------------------------------------------------------------------------------------
     always @(posedge clk) begin
-        if ((!rst)&&rdy_in)begin
+        if ((!rst)&&rdy_in&&start_cpu)begin
             if (EXE_STATE_CTR) begin
                 EXE_MEM_PC             <= ID_EXE_PC;
                 EXE_MEM_RD_INDEX       <= ID_EXE_RD_INDEX;
@@ -427,8 +431,9 @@ module CPU#(parameter LEN = 32,
     
     // memory visit
     always @(posedge clk) begin
-        if ((!rst)&&rdy_in) begin
+        if ((!rst)&&rdy_in&&start_cpu) begin
             if (MEM_STATE_CTR) begin
+
                 if (mem_vis_status == `RESTING) begin
                     // update pc
                     if (branch_flag) begin
@@ -486,7 +491,7 @@ module CPU#(parameter LEN = 32,
     end
     
     always @(posedge clk) begin
-        if ((!rst)&&rdy_in)begin
+        if ((!rst)&&rdy_in&&start_cpu)begin
             if (WB_STATE_CTR)begin
                 if (rb_flag) begin
                     rf_signal = 2'b10;
