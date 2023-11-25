@@ -15,8 +15,9 @@
 // 
 // #############################################################################################################################
 module IMMEDIATE_GENETATOR#(parameter LEN = 32)
-                           (input [LEN-1:0] instruction,
-                            input [5:0] inst_type,
+                           (input chip_enable,
+                            input [LEN-1:0] instruction,
+                            input wire [5:0] inst_type,
                             output reg signed [LEN-1:0] immediate);
     
     wire sign_bit;
@@ -33,15 +34,15 @@ module IMMEDIATE_GENETATOR#(parameter LEN = 32)
     
     // MUX to select
     always @(*) begin
-        case (inst_type)
-            6'b100000:immediate = R_imm;
-            6'b010000:immediate = I_imm;
-            6'b001000:immediate = S_imm;
-            6'b000100:immediate = B_imm;
-            6'b000010:immediate = U_imm;
-            6'b000001:immediate = J_imm;
-            default:
-            $display("[ERROR]:multiple inst_type\n");
-        endcase
+        if (chip_enable)begin
+            case (inst_type)
+                6'b100000:immediate = R_imm;
+                6'b010000:immediate = I_imm;
+                6'b001000:immediate = S_imm;
+                6'b000100:immediate = B_imm;
+                6'b000010:immediate = U_imm;
+                6'b000001:immediate = J_imm;
+            endcase
+        end
     end
 endmodule // imm_gen

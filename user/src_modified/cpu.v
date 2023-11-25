@@ -34,7 +34,8 @@ module CPU#(parameter LEN = 32,
             output [ADDR_WIDTH-1:0] mem_data_addr, // addr
             output inst_fetch_enabled,
             output mem_vis_enabled,
-            output [1:0] memory_vis_signal);
+            output [1:0] memory_vis_signal,
+            output [1:0] memory_vis_data_size);
     
     // REGISTER
     // ---------------------------------------------------------------------------------------------
@@ -53,6 +54,7 @@ module CPU#(parameter LEN = 32,
     reg [3:0]       ID_EXE_FUNC_CODE;        // func部分
     reg [2:0]       ID_EXE_ALU_SIGNAL;       // ALU信号
     reg [1:0]       ID_EXE_MEM_VIS_SIGNAL;   // 访存信号
+    reg [1:0]       ID_EXE_MEM_VIS_DATA_SIZE;
     reg [1:0]       ID_EXE_BRANCH_SIGNAL;
     reg [1:0]       ID_EXE_WB_SIGNAL;
     // exe_mem
@@ -64,6 +66,7 @@ module CPU#(parameter LEN = 32,
     reg [3:0]       EXE_MEM_FUNC_CODE;
     reg [1:0]       EXE_MEM_ZERO_BITS;    // condition
     reg [1:0]       EXE_MEM_MEM_VIS_SIGNAL;
+    reg [1:0]       EXE_MEM_MEM_VIS_DATA_SIZE;
     reg [1:0]       EXE_MEM_BRANCH_SIGNAL;
     reg [1:0]       EXE_MEM_WB_SIGNAL;
     // mem_wb
@@ -105,6 +108,7 @@ module CPU#(parameter LEN = 32,
     
     reg [2:0]       alu_signal;
     reg [1:0]       mem_vis_signal;
+    reg [1:0]       data_size;
     reg [1:0]       branch_signal;
     reg [1:0]       wb_signal;
     
@@ -115,12 +119,14 @@ module CPU#(parameter LEN = 32,
                 7'b0110011: begin
                     alu_signal     = `BINARY;
                     mem_vis_signal = `MEM_NOP;
+                    data_size      = `NOT_ACCESS;
                     branch_signal  = `NOT_BRANCH;
                     wb_signal      = `ARITH;
                 end
                 7'b0010011: begin
                     alu_signal     = `IMM_BINARY;
                     mem_vis_signal = `MEM_NOP;
+                    data_size      = `NOT_ACCESS;
                     branch_signal  = `NOT_BRANCH;
                     wb_signal      = `ARITH;
                 end
@@ -133,19 +139,29 @@ module CPU#(parameter LEN = 32,
                 7'b0010011: begin
                     alu_signal     = `IMM_BINARY;
                     mem_vis_signal = `MEM_NOP;
+                    data_size      = `NOT_ACCESS;
                     branch_signal  = `NOT_BRANCH;
                     wb_signal      = `ARITH;
                 end
+                // load
                 7'b0000011:begin
                     alu_signal     = `MEM_ADDR;
                     mem_vis_signal = `READ_DATA;
                     branch_signal  = `NOT_BRANCH;
                     wb_signal      = `MEM_TO_REG;
+                    case (func_code[2:0])
+                        3'b000:data_size = `BYTE;
+                        3'b001:data_size = `HALF;
+                        3'b010:data_size = `WORD;
+                        default:
+                        $display("[ERROR]:unexpected load instruction\n");
+                    endcase
                 end
                 // jalr
                 7'b1100111:begin
                     alu_signal     = `MEM_ADDR;
                     mem_vis_signal = `MEM_NOP;
+                    data_size      = `NOT_ACCESS;
                     branch_signal  = `UNCONDITIONAL_RESULT;
                     wb_signal      = `INCREASED_PC;
                 end
@@ -160,12 +176,20 @@ module CPU#(parameter LEN = 32,
             mem_vis_signal = `WRITE;
             branch_signal  = `NOT_BRANCH;
             wb_signal      = `WB_NOP;
+            case (func_code[2:0])
+                3'b000:data_size = `BYTE;
+                3'b001:data_size = `HALF;
+                3'b010:data_size = `WORD;
+                default:
+                $display("[ERROR]:unexpected load instruction\n");
+            endcase
         end
         else
         
         if (B_type) begin
             alu_signal     = `BRANCH_COND;
             mem_vis_signal = `MEM_NOP;
+            data_size      = `NOT_ACCESS;
             branch_signal  = `CONDITIONAL;
             wb_signal      = `WB_NOP;
         end
@@ -176,13 +200,15 @@ module CPU#(parameter LEN = 32,
                 7'b0110111:begin
                     alu_signal     = `IMM;
                     mem_vis_signal = `MEM_NOP;
+                    data_size      = `NOT_ACCESS;
                     branch_signal  = `NOT_BRANCH;
                     wb_signal      = `ARITH;
                 end
                 7'b0010111:begin
                     alu_signal     = `PC_BASED;
                     mem_vis_signal = `MEM_NOP;
-                    branch_signal  = 2'b00;
+                    data_size      = `NOT_ACCESS;
+                    branch_signal  = `NOT_BRANCH;
                     wb_signal      = `ARITH;
                 end
                 default:
@@ -194,6 +220,7 @@ module CPU#(parameter LEN = 32,
         if (J_type) begin
             alu_signal     = `PC_BASED;
             mem_vis_signal = `MEM_NOP;
+            data_size      = `NOT_ACCESS;
             branch_signal  = `UNCONDITIONAL;
             wb_signal      = `INCREASED_PC;
         end
@@ -207,10 +234,10 @@ module CPU#(parameter LEN = 32,
     assign inst_fetch_enabled = IF_STATE_CTR;
     assign mem_vis_enabled    = MEM_STATE_CTR;
     
-    assign mem_data_addr     = EXE_MEM_RESULT[ADDR_WIDTH-1:0];
-    assign memory_vis_signal = MEM_STATE_CTR ? EXE_MEM_MEM_VIS_SIGNAL:`MEM_NOP;
-    
-    assign mem_write_data = EXE_MEM_RS2;
+    assign mem_data_addr        = EXE_MEM_RESULT[ADDR_WIDTH-1:0];
+    assign memory_vis_signal    = MEM_STATE_CTR ? EXE_MEM_MEM_VIS_SIGNAL:`MEM_NOP;
+    assign memory_vis_data_size = EXE_MEM_MEM_VIS_DATA_SIZE;
+    assign mem_write_data       = EXE_MEM_RS2;
     
     
     
@@ -232,10 +259,14 @@ module CPU#(parameter LEN = 32,
     
     // REGISTER FILE
     // ----------------------------------------------------------------------------
-    reg                     rf_signal;
+    reg [1:0]               rf_signal;
+    wire [1:0]              rf_status;
+    wire                    write_back_enabled;
     reg [LEN-1:0]           reg_write_data;
     wire [LEN-1:0]          rs1_value;
     wire [LEN-1:0]          rs2_value;
+    
+    assign  write_back_enabled = WB_STATE_CTR;
     
     REG_FILE reg_file(
     .clk            (clk),
@@ -246,15 +277,17 @@ module CPU#(parameter LEN = 32,
     .rs2            (rs2_insdex),
     .rd             (MEM_WB_RD_INDEX),
     .data           (reg_write_data),
+    .write_back_enabled(write_back_enabled),
     .rs1_data       (rs1_value),
-    .rs2_data       (rs2_value)
-    // .rf_vis_finished(rf_finished)
+    .rs2_data       (rs2_value),
+    .rf_status       (rf_status)
     );
     
     // IMMIDIATE GENETATOR
     // -----------------------------------------------------------------------------
     wire [LEN-1:0]          immediate;
     IMMEDIATE_GENETATOR immediate_generator(
+    .chip_enable(chip_enable),
     .instruction        (instruction),
     .inst_type          ({R_type,I_type,S_type,B_type,U_type,J_type}),
     .immediate          (immediate)
@@ -327,22 +360,18 @@ module CPU#(parameter LEN = 32,
     always @(posedge clk) begin
         if ((!rst)&&rdy_in&&start_cpu) begin
             if (ID_STATE_CTR) begin
-                ID_EXE_PC <= IF_ID_PC;
-                rf_signal = 2'b01;
-                ID_EXE_RD_INDEX       <= rd_index;
-                ID_EXE_ALU_SIGNAL     <= alu_signal;
-                ID_EXE_FUNC_CODE      <= func_code;
-                ID_EXE_BRANCH_SIGNAL  <= branch_signal;
-                ID_EXE_MEM_VIS_SIGNAL <= mem_vis_signal;
-                ID_EXE_WB_SIGNAL      <= wb_signal;
-                ID_EXE_IMM            <= immediate;
-                ID_EXE_RS1            <= rs1_value; // 时间有误，存到了旧的数据
-                ID_EXE_RS2            <= rs2_value;
-                EXE_STATE_CTR         <= 1;
-                // end
-                // else begin
-                // EXE_STATE_CTR <= 0;
-                // end
+                ID_EXE_PC                <= IF_ID_PC;
+                ID_EXE_RD_INDEX          <= rd_index;
+                ID_EXE_ALU_SIGNAL        <= alu_signal;
+                ID_EXE_FUNC_CODE         <= func_code;
+                ID_EXE_BRANCH_SIGNAL     <= branch_signal;
+                ID_EXE_MEM_VIS_SIGNAL    <= mem_vis_signal;
+                ID_EXE_MEM_VIS_DATA_SIZE <= data_size;
+                ID_EXE_WB_SIGNAL         <= wb_signal;
+                ID_EXE_IMM               <= immediate;
+                ID_EXE_RS1               <= rs1_value; // 时间有误，存到了旧的数据
+                ID_EXE_RS2               <= rs2_value;
+                EXE_STATE_CTR            <= 1;
             end
             else begin
                 EXE_STATE_CTR <= 0;
@@ -356,17 +385,18 @@ module CPU#(parameter LEN = 32,
     always @(posedge clk) begin
         if ((!rst)&&rdy_in&&start_cpu)begin
             if (EXE_STATE_CTR) begin
-                EXE_MEM_PC             <= ID_EXE_PC;
-                EXE_MEM_RD_INDEX       <= ID_EXE_RD_INDEX;
-                EXE_MEM_FUNC_CODE      <= ID_EXE_FUNC_CODE;
-                EXE_MEM_BRANCH_SIGNAL  <= ID_EXE_BRANCH_SIGNAL;
-                EXE_MEM_MEM_VIS_SIGNAL <= ID_EXE_MEM_VIS_SIGNAL;
-                EXE_MEM_WB_SIGNAL      <= ID_EXE_WB_SIGNAL;
-                EXE_MEM_IMM            <= ID_EXE_IMM;
-                EXE_MEM_RS2            <= ID_EXE_RS2;
-                EXE_MEM_RESULT         <= alu_result;
-                EXE_MEM_ZERO_BITS      <= sign_bits;
-                MEM_STATE_CTR          <= 1;
+                EXE_MEM_PC                <= ID_EXE_PC;
+                EXE_MEM_RD_INDEX          <= ID_EXE_RD_INDEX;
+                EXE_MEM_FUNC_CODE         <= ID_EXE_FUNC_CODE;
+                EXE_MEM_BRANCH_SIGNAL     <= ID_EXE_BRANCH_SIGNAL;
+                EXE_MEM_MEM_VIS_SIGNAL    <= ID_EXE_MEM_VIS_SIGNAL;
+                EXE_MEM_MEM_VIS_DATA_SIZE <= ID_EXE_MEM_VIS_DATA_SIZE;
+                EXE_MEM_WB_SIGNAL         <= ID_EXE_WB_SIGNAL;
+                EXE_MEM_IMM               <= ID_EXE_IMM;
+                EXE_MEM_RS2               <= ID_EXE_RS2;
+                EXE_MEM_RESULT            <= alu_result;
+                EXE_MEM_ZERO_BITS         <= sign_bits;
+                MEM_STATE_CTR             <= 1;
             end
             else begin
                 MEM_STATE_CTR <= 0;
@@ -445,15 +475,6 @@ module CPU#(parameter LEN = 32,
                     MEM_WB_WB_SIGNAL <= EXE_MEM_WB_SIGNAL;
                     MEM_WB_RESULT    <= EXE_MEM_RESULT;
                 end
-                
-                // if ((EXE_MEM_MEM_VIS_SIGNAL == `MEM_NOP)||mem_vis_status == `R_W_FINISHED) begin
-                // // data from memmory
-                // MEM_WB_MEM_DATA <= mem_read_data;
-                // WB_STATE_CTR    <= 1;
-                // end
-                // else begin
-                // WB_STATE_CTR <= 0;
-                // end
             end
             
             if (mem_vis_status == `R_W_FINISHED) begin
@@ -501,7 +522,11 @@ module CPU#(parameter LEN = 32,
                     rf_signal = `RF_WRITE;
                 end
                 else rf_signal = `RF_NOP;
+            end
+            
+            if (rf_status == `RF_FINISHED) begin
                 IF_STATE_CTR <= 1;
+                rf_signal = `RF_NOP;
             end
             else begin
                 IF_STATE_CTR <= 0;

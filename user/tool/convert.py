@@ -50,8 +50,8 @@ elif B_type:
 
 elif U_type:
     print("U type")
-    imm=instruction[0:20]
-    rd=instruction[20:25]+"000000000000"
+    imm=instruction[0:20]+"000000000000"
+    rd=instruction[20:25]
 
 elif J_type:
     print("J type")
@@ -60,6 +60,6 @@ elif J_type:
 
 print("rs1:\t",rs1)
 print("rs2:\t",rs2)
-print("rs2:\t",rs2)
+print("rd:\t",rd)
 immediate=(int(imm,2))
-print("imm:\t",imm,'\t',immediate,'\t',hex(immediate))
+print("imm:\t",imm,'\t',immediate,'\t',oct(immediate))

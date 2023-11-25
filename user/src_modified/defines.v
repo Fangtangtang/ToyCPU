@@ -43,6 +43,13 @@
 `define     IF_FINISHED             2'b10
 `define     R_W_FINISHED            2'b11
 
+// Data Size
+// ----------------------------------------------------------
+`define     NOT_ACCESS              2'b00
+`define     BYTE                    2'b01
+`define     HALF                    2'b10
+`define     WORD                    2'b11
+
 // BRANCH
 // ----------------------------------------------------------
 `define     NOT_BRANCH              2'b00
@@ -58,5 +65,6 @@
 `define     INCREASED_PC            2'b11
 
 // Reg File 访问信号
-`define     RF_NOP                  1'b0
-`define     RF_WRITE                1'b1
+`define     RF_NOP                  2'b00
+`define     RF_WRITE                2'b01
+`define     RF_FINISHED             2'b10

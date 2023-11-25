@@ -11,8 +11,17 @@ module testbench;
 
     reg clk; 
     reg rst; 
-    top top_(.clk(clk), .btnC(rst));
     
+    top#(.SIM(1)) top_(
+        .EXCLK(clk),
+        .btnC(rst),
+        .Tx(),
+        .Rx(),
+        .led()
+    );
+
+   
+
     initial begin
         clk               = 0;
         rst               = 1;

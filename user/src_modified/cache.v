@@ -8,8 +8,10 @@
 // 
 // cpu和memory交互的中间单元
 // 主要用于辨别取instruction还是data
+// - data有大小，load读取后一律符号位拓展后再output，store写低位数据
 // 简易版(memory controler)，cashe size4
 // 状态机取数据
+// 
 // #############################################################################################################################
 `include "src_modified/defines.v"
 
@@ -24,10 +26,11 @@ module CACHE#(parameter ADDR_WIDTH = 17,
               input mem_vis_enabled,
               input [LEN-1:0] mem_write_data,
               input [1:0] memory_vis_signal,
+              input [1:0] memory_vis_data_size,
               output reg [LEN-1:0] mem_read_data,
               output reg [1:0] mem_vis_status,
               input [BYTE_SIZE-1:0] mem_data,         // interact with main memory
-              output reg [BYTE_SIZE-1:0] writen_data, // 写入memory的数据
+              output [BYTE_SIZE-1:0] mem_writen_data, // 写入memory的数据
               output [ADDR_WIDTH-1:0] mem_vis_addr,   // 访存地址
               output [1:0] mem_vis_signal);
     
@@ -37,17 +40,20 @@ module CACHE#(parameter ADDR_WIDTH = 17,
     reg [2:0] MEM_VIS_CNT = 0;
     
     reg [LEN-1:0] data;
-    wire [BYTE_SIZE-1:0] byte0, byte1, byte2, byte3;
-    assign byte0 = data[7:0];
-    assign byte1 = data[15:8];
-    assign byte2 = data[23:16];
-    assign byte3 = data[31:24];
+    // wire [BYTE_SIZE-1:0] byte0, byte1, byte2, byte3;
+    // assign byte0 = data[7:0];
+    // assign byte1 = data[15:8];
+    // assign byte2 = data[23:16];
+    // assign byte3 = data[31:24];
     
-    // reg [ADDR_WIDTH-1:0] init_addr;
     reg [ADDR_WIDTH-1:0] addr;
     assign mem_vis_addr = addr;
     
+    reg [BYTE_SIZE-1:0] writen_data;
+    assign mem_writen_data = writen_data;
+    
     reg [1:0] mem_vis_type = 0;
+    reg [1:0] data_size    = 0;
     assign mem_vis_signal  = mem_vis_type;
     
     always @(posedge clk) begin
@@ -58,7 +64,7 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 mem_vis_status <= `WORKING;
                 // write
                 if (mem_vis_type == `WRITE) begin
-                    writen_data = byte0;
+                    writen_data <= mem_write_data[15:8];
                     addr <= addr + 1;
                 end
                 // read
@@ -71,7 +77,7 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 mem_vis_status <= `WORKING;
                 // write
                 if (mem_vis_type == `WRITE) begin
-                    writen_data = byte1;
+                    writen_data <= mem_write_data[23:16];
                     addr <= addr + 1;
                 end
                 // read
@@ -85,7 +91,7 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 mem_vis_status <= `WORKING;
                 // write
                 if (mem_vis_type == `WRITE) begin
-                    writen_data = byte2;
+                    writen_data <= mem_write_data[31:24];
                     addr <= addr+1;
                 end
                 // read
@@ -98,8 +104,6 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 MEM_VIS_CNT = MEM_VIS_CNT - 1;
                 // write
                 if (mem_vis_type == `WRITE) begin
-                    mem_vis_status <= `R_W_FINISHED;
-                    writen_data = byte3;
                 end
                 // read
                 else begin
@@ -110,7 +114,6 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 MEM_VIS_CNT = MEM_VIS_CNT - 1;
                 if (mem_vis_type == `WRITE) begin
                     mem_vis_status <= `R_W_FINISHED;
-                    writen_data = byte3;
                 end
                 else if (mem_vis_type == `READ_DATA)begin
                     mem_vis_status <= `R_W_FINISHED;
@@ -126,15 +129,17 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                 end
             end
             0:begin
-                // todo 逻辑错误
                 if (mem_vis_type == `MEM_NOP) begin
                     if (inst_fetch_enabled) begin
-                        mem_vis_type = `READ_INST;
-                        addr         = mem_inst_addr;
-                        MEM_VIS_CNT  = 5;
+                        mem_vis_type <= `READ_INST;
+                        addr        = mem_inst_addr;
+                        MEM_VIS_CNT = 5;
                         mem_vis_status <= `WORKING;
                     end
-                    else if (mem_vis_enabled) begin
+                    
+                    else
+                    if (mem_vis_enabled) begin
+                        data_size <= memory_vis_data_size;
                         case (memory_vis_signal)
                             `MEM_NOP:begin
                                 mem_vis_type <= `READ_DATA; // 形式记号
@@ -143,7 +148,14 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                             end
                             `READ_DATA:begin
                                 mem_vis_type <= `READ_DATA;
-                                addr        = mem_data_addr;
+                                addr = mem_data_addr;
+                                case (memory_vis_data_size)
+                                    `BYTE:MEM_VIS_CNT = 2;
+                                    `HALF:MEM_VIS_CNT = 3;
+                                    `WORD:MEM_VIS_CNT = 5;
+                                    default:
+                                    $display("[ERROR]:unexpected data_size in load\n");
+                                endcase
                                 MEM_VIS_CNT = 5;
                                 mem_vis_status <= `WORKING;
                             end
@@ -155,16 +167,23 @@ module CACHE#(parameter ADDR_WIDTH = 17,
                             end
                             `WRITE:begin
                                 mem_vis_type <= `WRITE;
-                                addr        = mem_data_addr;
-                                data        = mem_write_data;
-                                MEM_VIS_CNT = 5;
+                                addr = mem_data_addr;
+                                data = mem_write_data;
+                                writen_data <= mem_write_data[7:0];
+                                case (memory_vis_data_size)
+                                    `BYTE:MEM_VIS_CNT = 2;
+                                    `HALF:MEM_VIS_CNT = 3;
+                                    `WORD:MEM_VIS_CNT = 5;
+                                    default:
+                                    $display("[ERROR]:unexpected data_size in store\n");
+                                endcase
                                 mem_vis_status <= `WORKING;
                             end
                         endcase
                     end
                 end
                 else begin
-                    mem_vis_type = `MEM_NOP;
+                    mem_vis_type   <= `MEM_NOP;
                     mem_vis_status <= `RESTING;
                 end
             end

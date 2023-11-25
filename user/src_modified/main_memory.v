@@ -30,6 +30,21 @@ module MAIN_MEMORY#(parameter ADDR_WIDTH = 17,
         $readmemh("/mnt/f/repo/ToyCPU/user/testspace/test.data", storage);
     end
     
+    integer file;
+    initial begin
+        file = $fopen("/mnt/f/repo/ToyCPU/user/log.out","w");
+    end
+
+    always @(posedge clk) begin
+        $fdisplay(file,$realtime);
+        $fdisplay(file,"mem0:%d %o",storage[10],storage[10]);
+        $fdisplay(file,"mem1:%d %o",storage[11],storage[11]);
+        $fdisplay(file,"mem2:%d %o",storage[12],storage[12]);
+        $fdisplay(file,"mem3:%d %o",storage[13],storage[13]);
+        $fdisplay(file,"mem4:%d %o",storage[14],storage[14]);
+        $fdisplay(file,"mem5:%d %o",storage[15],storage[15]);
+    end
+
     always @(posedge clk) begin
         if (mem_vis_signal == `WRITE) begin
             storage[mem_vis_addr] <= writen_data;

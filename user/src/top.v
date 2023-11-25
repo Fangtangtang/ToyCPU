@@ -85,8 +85,8 @@ module riscv_top #(parameter SIM = 0)
     // Use controller to interact.
     // 
     wire 						hci_active_out;
-    wire [7:0] 				hci_ram_din;
-    wire [7:0] 				hci_ram_dout;
+    wire [7:0] 				    hci_ram_din;
+    wire [7:0] 				    hci_ram_dout;
     wire [RAM_ADDR_WIDTH-1:0] 	hci_ram_a;
     wire        				hci_ram_wr;
     
