@@ -29,7 +29,7 @@ module ALU#(parameter LEN = 32)
                 endcase
             end
             `IMM_BINARY:begin
-                case (func_code)
+                case (func_code[2:0])
                     `ADDI:result = rs1 + imm;
                     `SLTI:result = rs1 < imm ? 1 : 0;
                     default:

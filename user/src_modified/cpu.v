@@ -259,7 +259,7 @@ module CPU#(parameter LEN = 32,
     
     // REGISTER FILE
     // ----------------------------------------------------------------------------
-    reg [1:0]               rf_signal;
+    wire [1:0]              rf_signal;
     wire [1:0]              rf_status;
     wire                    write_back_enabled;
     reg [LEN-1:0]           reg_write_data;
@@ -267,6 +267,7 @@ module CPU#(parameter LEN = 32,
     wire [LEN-1:0]          rs2_value;
     
     assign  write_back_enabled = WB_STATE_CTR;
+    assign  rf_signal          = (WB_STATE_CTR&&rb_flag)? `RF_WRITE:`RF_NOP;
     
     REG_FILE reg_file(
     .clk            (clk),
@@ -280,7 +281,7 @@ module CPU#(parameter LEN = 32,
     .write_back_enabled(write_back_enabled),
     .rs1_data       (rs1_value),
     .rs2_data       (rs2_value),
-    .rf_status       (rf_status)
+    .rf_status      (rf_status)
     );
     
     // IMMIDIATE GENETATOR
@@ -517,16 +518,8 @@ module CPU#(parameter LEN = 32,
     
     always @(posedge clk) begin
         if ((!rst)&&rdy_in&&start_cpu)begin
-            if (WB_STATE_CTR)begin
-                if (rb_flag) begin
-                    rf_signal = `RF_WRITE;
-                end
-                else rf_signal = `RF_NOP;
-            end
-            
             if (rf_status == `RF_FINISHED) begin
                 IF_STATE_CTR <= 1;
-                rf_signal = `RF_NOP;
             end
             else begin
                 IF_STATE_CTR <= 0;

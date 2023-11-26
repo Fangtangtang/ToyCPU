@@ -34,32 +34,36 @@ elif I_type:
     print("I type")
     rs1=instruction[12:17]
     rd=instruction[20:25]
-    imm=instruction[0:12]
+    imm=instruction[0]*20+instruction[0:12]
 
 elif S_type:
     print("S type")
     rs1=instruction[12:17]
     rs2=instruction[7:12]
-    imm=instruction[0:7]+instruction[20:25]
+    imm=instruction[0]*20+instruction[0:7]+instruction[20:25]
 
 elif B_type:
     print("B type")
     rs1=instruction[12:17]
     rs2=instruction[7:12]
-    imm=instruction[0]+instruction[24]+instruction[1:7]+instruction[20:24]+"0"
+    imm=instruction[0]*20+instruction[0]+instruction[24]+instruction[1:7]+instruction[20:24]+"0"
 
 elif U_type:
     print("U type")
     imm=instruction[0:20]+"000000000000"
-    rd=instruction[20:25]
+    rd=instruction[20]*12+instruction[20:25]
 
 elif J_type:
     print("J type")
-    imm=instruction[0]+instruction[12:20]+instruction[11]+instruction[1:11]+"0"
+    imm=instruction[0]*12+instruction[0]+instruction[12:20]+instruction[11]+instruction[1:11]+"0"
     rd=instruction[20:25]
 
 print("rs1:\t",rs1)
 print("rs2:\t",rs2)
 print("rd:\t",rd)
 immediate=(int(imm,2))
+if imm[0] == "0":
+    immediate = int(imm, 2)  # 解释为无符号整数
+else:
+    immediate = -((int(imm, 2) ^ 0xFFFFFFFF) + 1)  # 解释为有符号整数
 print("imm:\t",imm,'\t',immediate,'\t',oct(immediate))

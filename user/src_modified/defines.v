@@ -26,8 +26,8 @@
 `define     ADD                     4'b0000
 
 // IMM
-`define     ADDI                    4'b0000
-`define     SLTI                    4'b0010
+`define     ADDI                    3'b000
+`define     SLTI                    3'b010
 
 // MEM 访存信号
 // ----------------------------------------------------------

@@ -33,20 +33,6 @@ module REG_FILE #(parameter LEN = 32)
     reg [1:0]               status;
     assign rf_status = status;
     
-    // integer file;
-    // initial begin
-    //     file = $fopen("/mnt/f/repo/ToyCPU/user/log.out","w");
-    // end
-    // always @(*) begin
-    //     $fdisplay(file,$realtime);
-    //     $fdisplay(file,"reg0:%d %o",register[0],register[0]);
-    //     $fdisplay(file,"reg1:%d %o",register[1],register[1]);
-    //     $fdisplay(file,"reg2:%d %o",register[2],register[2]);
-    //     $fdisplay(file,"reg3:%d %o",register[3],register[3]);
-    //     $fdisplay(file,"reg4:%d %o",register[4],register[4]);
-    //     $fdisplay(file,"reg5:%d %o",register[5],register[5]);
-    // end
-    
     assign rs1_data = register[rs1_index];
     assign rs2_data = register[rs2_index];
     
@@ -67,18 +53,47 @@ module REG_FILE #(parameter LEN = 32)
             if (write_back_enabled)begin
                 if (rf_signal == `RF_WRITE) begin
                     register[rd] <= data;
-                    // status    <= `RF_FINISHED;
                 end
-                // else begin
-                // status <= `RF_NOP;
-                // end
                 status <= `RF_FINISHED;
             end
             else begin
                 status <= `RF_NOP;
             end
-            
-            
         end
     end
+    
+    // register value 
+    wire [31:0] reg0Value  = register[0];
+    wire [31:0] reg1Value  = register[1];
+    wire [31:0] reg2Value  = register[2];
+    wire [31:0] reg3Value  = register[3];
+    wire [31:0] reg4Value  = register[4];
+    wire [31:0] reg5Value  = register[5];
+    wire [31:0] reg6Value  = register[6];
+    wire [31:0] reg7Value  = register[7];
+    wire [31:0] reg8Value  = register[8];
+    wire [31:0] reg9Value  = register[9];
+    wire [31:0] reg10Value = register[10];
+    wire [31:0] reg11Value = register[11];
+    wire [31:0] reg12Value = register[12];
+    wire [31:0] reg13Value = register[13];
+    wire [31:0] reg14Value = register[14];
+    wire [31:0] reg15Value = register[15];
+    wire [31:0] reg16Value = register[16];
+    wire [31:0] reg17Value = register[17];
+    wire [31:0] reg18Value = register[18];
+    wire [31:0] reg19Value = register[19];
+    wire [31:0] reg20Value = register[20];
+    wire [31:0] reg21Value = register[21];
+    wire [31:0] reg22Value = register[22];
+    wire [31:0] reg23Value = register[23];
+    wire [31:0] reg24Value = register[24];
+    wire [31:0] reg25Value = register[25];
+    wire [31:0] reg26Value = register[26];
+    wire [31:0] reg27Value = register[27];
+    wire [31:0] reg28Value = register[28];
+    wire [31:0] reg29Value = register[29];
+    wire [31:0] reg30Value = register[30];
+    wire [31:0] reg31Value = register[31];
+
 endmodule

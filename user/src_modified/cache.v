@@ -40,11 +40,6 @@ module CACHE#(parameter ADDR_WIDTH = 17,
     reg [2:0] MEM_VIS_CNT = 0;
     
     reg [LEN-1:0] data;
-    // wire [BYTE_SIZE-1:0] byte0, byte1, byte2, byte3;
-    // assign byte0 = data[7:0];
-    // assign byte1 = data[15:8];
-    // assign byte2 = data[23:16];
-    // assign byte3 = data[31:24];
     
     reg [ADDR_WIDTH-1:0] addr;
     assign mem_vis_addr = addr;
